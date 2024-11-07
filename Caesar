@@ -1,0 +1,56 @@
+import numpy as np
+import torch
+from torch.utils.data import Dataset, DataLoader
+from sklearn.preprocessing import OneHotEncoder
+
+def caesar_cipher(text, shift):
+    result = ""
+    for char in text:
+        if char.isalpha():
+            shift_base = ord('A') if char.isupper() else ord('a')
+            result += chr((ord(char) - shift_base + shift) % 26 + shift_base)
+        else:
+            result += char
+    return result
+
+def generate_data(num_samples, max_len, shift):
+    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    data = []
+    for _ in range(num_samples):
+        text_len = np.random.randint(1, max_len + 1)
+        text = ''.join(np.random.choice(list(alphabet), text_len))
+        encrypted_text = caesar_cipher(text, shift)
+        data.append((encrypted_text, text))
+    return data
+
+class CaesarDataset(Dataset):
+    def __init__(self, data, max_len):
+        self.data = data
+        self.max_len = max_len
+        self.encoder = OneHotEncoder(handle_unknown='ignore')
+        self.encoder.fit(np.array(list('abcdefghijklmnopqrstuvwxyz')).reshape(-1, 1))
+https://github.com/SmallSquirrel3/-aesar/tree/main
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        encrypted_text, original_text = self.data[idx]
+        enc_seq = self.encoder.transform(np.array(list(encrypted_text)).reshape(-1, 1)).toarray()
+        orig_seq = self.encoder.transform(np.array(list(original_text)).reshape(-1, 1)).toarray()
+
+        enc_seq_padded = np.zeros((self.max_len, 26))
+        orig_seq_padded = np.zeros((self.max_len, 26))
+
+        enc_seq_padded[:len(enc_seq), :] = enc_seq
+        orig_seq_padded[:len(orig_seq), :] = orig_seq
+
+        enc_seq_tensor = torch.tensor(enc_seq_padded, dtype=torch.float32)
+        orig_seq_tensor = torch.tensor(orig_seq_padded, dtype=torch.float32)
+
+        return enc_seq_tensor, orig_seq_tensor
+
+max_len = 10
+shift = 3
+data = generate_data(10000, max_len, shift)
+dataset = CaesarDataset(data, max_len)
+dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
